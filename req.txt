@@ -1,0 +1,2 @@
+pip install streamlit-elements==0.1.*
+(https://github.com/okld/streamlit-elements/tree/main)
