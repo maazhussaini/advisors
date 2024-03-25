@@ -10,3 +10,5 @@
 
 # Ignore Database file
 dbConnection.py
+
+myenv/

@@ -1,2 +1,13 @@
-pip install streamlit-elements==0.1.*
-(https://github.com/okld/streamlit-elements/tree/main)
+streamlit
+numpy
+pandas
+streamlit_extras
+millify
+altair
+plotly
+fpdf2
+mysql-connector-python
+seaborn
+openpyxl
+matplotlib
+#kaleido
