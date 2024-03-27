@@ -58,7 +58,10 @@ def is_crnt(df_assumption):
     
     # df_assumption = read_assumption_file()
     
-    df_assumption = pd.DataFrame(df_assumption)
+    try:
+        df_assumption = pd.DataFrame(df_assumption)
+    except:
+        df_assumption = pd.read_json(df_assumption)
     df_assumption = df_assumption[df_assumption['Select'] == True]
     
     if not df_assumption.empty:
