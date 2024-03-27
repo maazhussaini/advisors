@@ -10,4 +10,4 @@ mysql-connector-python
 seaborn
 openpyxl
 matplotlib
-#kaleido
+flask-restful
