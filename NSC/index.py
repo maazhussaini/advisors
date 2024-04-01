@@ -1,6 +1,7 @@
 from flask import Flask, request, jsonify
 from flask_restful import Resource, Api, reqparse
 import pandas as pd
+import json
 
 app = Flask(__name__)
 
@@ -37,7 +38,7 @@ def process_sheet(df):
     df['year'] = df['year'].astype('int')
     return df
 
-@app.route('/assumption_data')
+@app.route('/assumption_data', methods=['GET'])
 def read_assumption_file():
     filePath_assumption = "E:/MaazProducts/Fiverr/Platform/advisors/Statis DashBoard/SourceData/NSC/Assumption.xlsx"
     df_assumption = pd.read_excel(filePath_assumption)
@@ -52,106 +53,124 @@ def read_assumption_file():
     
     return df_assumption.to_json(orient='records')
 
-
-@app.route('/is_crnt/<df_assumption>')
-def is_crnt(df_assumption):
+@app.route('/is_crnt', methods = ['POST'])
+def is_crnt():
     
     # df_assumption = read_assumption_file()
-    
-    try:
-        df_assumption = pd.DataFrame(df_assumption)
-    except:
-        df_assumption = pd.read_json(df_assumption)
-    df_assumption = df_assumption[df_assumption['Select'] == True]
-    
-    if not df_assumption.empty:
-        predicted_year = 8
-            
-    
-    predicted_year = int(predicted_year)
-    df_assumption = process_sheet(df_assumption)
-    
-    df_fs = read_excel_file(file_path='', sheet_name='INCOME STATEMENT')
-    df_fs = process_sheet(df_fs)
-    
-    year_fs = df_fs['year'].to_list()
-    last_year = year_fs[-1]
-    df_fs_last_year = df_fs[df_fs['year'] == last_year]
-    
-    new_row_list = []
-    
-    for no_year in range(predicted_year):
-        new_row = {}
-        df_assumption_last_year = df_assumption[df_assumption['year'] == last_year]
-        df_assumption_current_year = df_assumption[df_assumption['year'] == last_year + 1]
+    if request.is_json:
         
-        if not df_assumption_last_year.empty and not df_assumption_current_year.empty:
-            
-            for i in df_fs.columns.to_list():
-                if i == 'year':
-                    value = last_year + 1
-                else:
-                    value = 0
-                    
-                if no_year == 0:    
-                    if i in df_assumption_last_year.columns.to_list():
-                        
-                        if i == 'revenue' or i == 'general and administrative expenses':
-                            value = (1 + df_assumption_current_year[i].values[0]) * df_fs_last_year[i].values[0]
-                        
-                        elif i == 'selling and marketing expenses':
-                            value =  -1 + df_assumption_current_year[i].values[0] * df_fs_last_year[i].values[0]
-                        
-                    elif i == 'cost of revenues':
-                        value = -1 * (1 - df_assumption_current_year['gp margin'].values[0]) * df_fs_last_year[i].values[0]
-                            
-                else:
-                    if i in list(new_row_list[-1].keys()):
-                        
-                        if i == 'revenue' or i == 'general and administrative expenses':
-                            value = (1 + df_assumption_current_year[i].values[0]) * new_row_list[-1][i]
-                        
-                        elif i == 'selling and marketing expenses':
-                            value =  -1 + df_assumption_current_year[i].values[0] * new_row_list[-1][i]
-                        
-                        elif i == 'cost of revenues':
-                            value = -1 * (1 + df_assumption_current_year['gp margin'].values[0]) * new_row_list[-1][i]
-                
-                new_row[i] = value
+        # Extract data from the JSON request
+        data = request.get_json()
+        df_assumption = data.get('df_assumption', None)
+        
+        if df_assumption is not None:
+            # Process the df_assumption here
+            df_assumption = pd.DataFrame(df_assumption)
         else:
-            break
+            # df_assumption wasn't provided
+            return jsonify({"error": "Missing df_assumption data"}), 400
         
-        last_year = last_year + 1
-        new_row['gross profit'] = new_row['revenue'] + new_row['cost of revenues']
-        new_row['profit from operations'] = new_row['gross profit'] + new_row['selling and marketing expenses'] + new_row['general and administrative expenses']
-        new_row_list.append(new_row)
-    
-    # Assuming 'new_row_list' and 'df_fs' are defined earlier in your code
-    df = pd.DataFrame(new_row_list)
+        try:
+            df_assumption = pd.DataFrame(df_assumption)
+        except:
+            df_assumption = pd.read_json(df_assumption)
+        
+        
+        df_assumption = df_assumption[df_assumption['Select'] == True]
+        
+        if not df_assumption.empty:
+            predicted_year = 8
+                
+        
+        predicted_year = int(predicted_year)
+        df_assumption = process_sheet(df_assumption)
+        
+        df_fs = read_excel_file(file_path='', sheet_name='INCOME STATEMENT')
+        df_fs = process_sheet(df_fs)
+        
+        year_fs = df_fs['year'].to_list()
+        last_year = year_fs[-1]
+        df_fs_last_year = df_fs[df_fs['year'] == last_year]
+        
+        new_row_list = []
+        
+        for no_year in range(predicted_year):
+            new_row = {}
+            df_assumption_last_year = df_assumption[df_assumption['year'] == last_year]
+            df_assumption_current_year = df_assumption[df_assumption['year'] == last_year + 1]
+            
+            if not df_assumption_last_year.empty and not df_assumption_current_year.empty:
+                
+                for i in df_fs.columns.to_list():
+                    if i == 'year':
+                        value = last_year + 1
+                    else:
+                        value = 0
+                        
+                    if no_year == 0:    
+                        if i in df_assumption_last_year.columns.to_list():
+                            
+                            if i == 'revenue' or i == 'general and administrative expenses':
+                                value = (1 + df_assumption_current_year[i].values[0]) * df_fs_last_year[i].values[0]
+                            
+                            elif i == 'selling and marketing expenses':
+                                value =  -1 + df_assumption_current_year[i].values[0] * df_fs_last_year[i].values[0]
+                            
+                        elif i == 'cost of revenues':
+                            value = -1 * (1 - df_assumption_current_year['gp margin'].values[0]) * df_fs_last_year[i].values[0]
+                                
+                    else:
+                        if i in list(new_row_list[-1].keys()):
+                            
+                            if i == 'revenue' or i == 'general and administrative expenses':
+                                value = (1 + df_assumption_current_year[i].values[0]) * new_row_list[-1][i]
+                            
+                            elif i == 'selling and marketing expenses':
+                                value =  -1 + df_assumption_current_year[i].values[0] * new_row_list[-1][i]
+                            
+                            elif i == 'cost of revenues':
+                                value = -1 * (1 + df_assumption_current_year['gp margin'].values[0]) * new_row_list[-1][i]
+                    
+                    new_row[i] = value
+            else:
+                break
+            
+            last_year = last_year + 1
+            new_row['gross profit'] = new_row['revenue'] + new_row['cost of revenues']
+            new_row['profit from operations'] = new_row['gross profit'] + new_row['selling and marketing expenses'] + new_row['general and administrative expenses']
+            new_row_list.append(new_row)
+        
+        # Assuming 'new_row_list' and 'df_fs' are defined earlier in your code
+        df = pd.DataFrame(new_row_list)
 
-    # Concatenate df_fs with the new DataFrame. Ensure that the indexes are ignored to avoid duplicate indexes.
-    df = pd.concat([df_fs, df], ignore_index=True)
+        # Concatenate df_fs with the new DataFrame. Ensure that the indexes are ignored to avoid duplicate indexes.
+        df = pd.concat([df_fs, df], ignore_index=True)
 
-    # Fill NaN values with 0
-    df = df.fillna(0)
-    
-    df['year'] = df['year'].astype('str')
-    df_copy = df.rename(columns={df.columns[0]: 'components'})
-    
-    # Now, transpose the DataFrame
-    df_copy = df_copy.transpose().reset_index()
+        # Fill NaN values with 0
+        df = df.fillna(0)
+        
+        df['year'] = df['year'].astype('str')
+        df_copy = df.rename(columns={df.columns[0]: 'components'})
+        
+        # Now, transpose the DataFrame
+        df_copy = df_copy.transpose().reset_index()
 
-    new_header = df_copy.iloc[0].to_list()
+        new_header = df_copy.iloc[0].to_list()
 
-    for i, value in enumerate(new_header):
-        new_header[i] = str(value).lower().strip()
+        for i, value in enumerate(new_header):
+            new_header[i] = str(value).lower().strip()
 
-    df_copy = df_copy[1:]
-    df_copy.columns = new_header
-    df_copy.set_index(df_copy.columns[0], inplace=True)
-    
-    # return df, df_copy
-    return df.to_json()
+        df_copy = df_copy[1:]
+        df_copy.columns = new_header
+        df_copy.set_index(df_copy.columns[0], inplace=True)
+        
+        df = df.to_json(orient='records')
+        
+        # return df, df_copy
+        return df, 200
+
+    else:
+        return jsonify({"error": "Request must be JSON"}), 400   
 
 def is_conn(df_assumption, predicted_year):
     
@@ -272,10 +291,9 @@ def workingCapital(is_crnt_df):
 def balanceSheet():
     df = read_excel_file(file_path='', sheet_name='BALANCESHEET')
 
-def main():
+# def main():
     
-    is_crnt_df, is_crnt_df_copy = is_crnt()
-    
+#     is_crnt_df, is_crnt_df_copy = is_crnt()
 
 if __name__ == '__main__':
-    app.run()
+    app.run(debug=True)
