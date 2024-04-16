@@ -525,11 +525,10 @@ def Equity(predicted_year = 4):
     
     return Equity_df
 
+@app.route('/BalanceSheet', methods=['POST'])
 def balanceSheet():
     
-    
     if request.is_json:
-        
         # Extract data from the JSON request
         data = request.get_json()
         workingCapital_df = data.get('workingCapital_df', None)
@@ -658,7 +657,6 @@ def balanceSheet():
     
     temp_balanceSheet_df = pd.DataFrame(temp_balanceSheet_dict)
     temp_balanceSheet_df = tranposing(df=temp_balanceSheet_df, column_name="BALANCE SHEET")
-    # st.write(temp_balanceSheet_df)
 
 if __name__ == '__main__':
     app.run(debug=True)
