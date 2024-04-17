@@ -183,15 +183,16 @@ def is_crnt(predicted_year = 8):
         df_copy.columns = new_header
         df_copy.set_index(df_copy.columns[0], inplace=True)
         
+        df = tranposing(df, 'components')
+        
         df = df.to_json(orient='records')
         
-        # return df, df_copy
         return df, 200
 
     else:
         return jsonify({"error": "Request must be JSON"}), 400   
 
-@app.route('/workingCapital', methods=['GET'])
+@app.route('/workingCapital', methods=['POST'])
 def workingCapital(prediction_year = 4):
 
     if request.is_json:
@@ -211,13 +212,16 @@ def workingCapital(prediction_year = 4):
             is_crnt_df = pd.DataFrame(is_crnt_df)
         except:
             is_crnt_df = pd.read_json(is_crnt_df)
-    
+
+        
+        
         workingCapital_df = read_excel_file(file_path='', sheet_name='WC')
         is_crnt_df = is_crnt_df.reset_index()
+        # workingCapital_df.columns = workingCapital_df.columns.map(str)  # Convert column names to strings
         
         last_year = workingCapital_df.columns.to_list()[-1]
         
-        revenue = is_crnt_df.loc[[0, 1, 4], : str(last_year)]
+        revenue = is_crnt_df.loc[[0, 1, 4], :str(last_year)]  # Access using string indexer
         
         key_indicators_list = []
         key_indicators_dict = {}
@@ -334,8 +338,7 @@ def workingCapital(prediction_year = 4):
         
         workingCapital_predicted_df = pd.concat([workingCapital_df, workingCapital_predicted_df], axis=1)
         
-        # st.dataframe(workingCapital_predicted_df, hide_index=True)
-        # st.dataframe(key_indicators_df, hide_index=True)
+        workingCapital_predicted_df = workingCapital_predicted_df.to_json(orient='records')
         
         return workingCapital_predicted_df
     else:
@@ -387,6 +390,8 @@ def debt(predicted_year = 4):
     temp_df.drop('DEBT', axis=1, inplace=True)
     
     debt_df = pd.concat([debt_df, temp_df], axis=1)
+    
+    debt_df = debt_df.to_json(orient='records')
     
     return debt_df
 
@@ -442,9 +447,11 @@ def fixedAsset(predicted_year = 4):
         
         fixedAsset_df = pd.concat([fixedAsset_df, temp_df], axis=1)
         
+        fixedAsset_df = fixedAsset_df.to_json(orient='records')
+        
         return fixedAsset_df
 
-@app.route('/Equity', methods=['POST'])
+@app.route('/Equity', methods=['GET'])
 def Equity(predicted_year = 4):
     
     Equity_df = read_excel_file(file_path='', sheet_name='EQUITY')
@@ -523,6 +530,8 @@ def Equity(predicted_year = 4):
     
     Equity_df = pd.concat([Equity_df, temp_df], axis=1)
     
+    Equity_df = Equity_df.to_json(orient='records')
+    
     return Equity_df
 
 @app.route('/BalanceSheet', methods=['POST'])
@@ -531,23 +540,27 @@ def balanceSheet():
     if request.is_json:
         # Extract data from the JSON request
         data = request.get_json()
-        workingCapital_df = data.get('workingCapital_df', None)
-        debt_df = data.get('debt_df', None)
-        fixedAsset_df = data.get('fixedAsset_df', None)
-        Equity_df = data.get('Equity_df', None)
+        workingCapital_df = data.get('workingCapital', None)
+        debt_df = data.get('debt', None)
+        fixedAsset_df = data.get('fixedAsset', None)
+        Equity_df = data.get('equity', None)
         
-        if df_assumption is not None:
+        if (workingCapital_df is not None) | (debt_df is not None) | (fixedAsset_df is not None) | (Equity_df is not None):
             # Process the df_assumption here
-            df_assumption = pd.DataFrame(df_assumption)
+            try:
+                workingCapital_df = pd.DataFrame(workingCapital_df)
+                debt_df = pd.DataFrame(debt_df)
+                fixedAsset_df = pd.DataFrame(fixedAsset_df)
+                Equity_df = pd.DataFrame(Equity_df)
+            except:
+                workingCapital_df = pd.read_json(workingCapital_df)
+                debt_df = pd.read_json(debt_df)
+                fixedAsset_df = pd.read_json(fixedAsset_df)
+                Equity_df = pd.read_json(Equity_df)
+                
         else:
             # df_assumption wasn't provided
             return jsonify({"error": "Missing df_assumption data"}), 400
-        
-        try:
-            df_assumption = pd.DataFrame(df_assumption)
-        except:
-            df_assumption = pd.read_json(df_assumption)
-            
             
     balanceSheet_df = read_excel_file(file_path='', sheet_name='BALANCESHEET')
     
@@ -657,6 +670,10 @@ def balanceSheet():
     
     temp_balanceSheet_df = pd.DataFrame(temp_balanceSheet_dict)
     temp_balanceSheet_df = tranposing(df=temp_balanceSheet_df, column_name="BALANCE SHEET")
+    
+    temp_balanceSheet_df = temp_balanceSheet_df.to_json(orient='records')
+    
+    return temp_balanceSheet_df
 
 if __name__ == '__main__':
     app.run(debug=True)
