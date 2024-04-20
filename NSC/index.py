@@ -35,7 +35,10 @@ def process_sheet(df):
     df = df.rename(columns={df.columns[0]: 'year'})
     
     # change from int to str
-    df['year'] = df['year'].astype('int')
+    try:
+        df['year'] = df['year'].astype('int')
+    except:
+        pass
     return df
 
 def tranposing(df, column_name):
