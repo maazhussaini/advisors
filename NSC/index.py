@@ -4,7 +4,7 @@ import pandas as pd
 import json
 from modules.is_current import isCurrent
 from modules.wc import working_capital_indicators, working_capital
-from modules.bs import working_Capital
+from modules.bs import working_Capital, debt_checking, FA_checking, equity_checking
 
 app = Flask(__name__)
 
@@ -20,17 +20,12 @@ def read_excel_file(file_path, sheet_name=None):
 
 def process_assumption_sheet(df):
     
-    df.to_csv("assumption_mid1.csv", index=False)
-    
     try:
         df = df.drop('Select', axis=1)
         df = df.drop('BASE', axis=1)
     except:
         pass
-    
-    df.to_csv("assumption_mid2.csv", index=False)
     df = df.transpose().reset_index()
-    df.to_csv("assumption_mid3.csv", index=False)
     
     new_header = df.iloc[-1].to_list()
     
@@ -439,7 +434,6 @@ def balanceSheet():
                 debt_df = pd.read_json(debt_df)
                 fixedAsset_df = pd.read_json(fixedAsset_df)
                 Equity_df = pd.read_json(Equity_df)
-                
         else:
             # df_assumption wasn't provided
             return jsonify({"error": "Missing df_assumption data"}), 400
@@ -447,113 +441,92 @@ def balanceSheet():
     balanceSheet_df = read_excel_file(file_path='', sheet_name='BALANCESHEET')
     
     balanceSheet_dict = balanceSheet_df.to_dict(orient='records')
-    
     last_year = balanceSheet_df.columns.to_list()[-1]
     
-    """
-        Working with WC
-    """
-    
-    workingCapital_predicted_df = workingCapital_df.loc[:, str(last_year+1): ]
-    workingCapital_predicted_df = pd.concat([workingCapital_df.iloc[:, : 1], workingCapital_predicted_df], axis=1)
-    workingCapital_predicted_dict = workingCapital_predicted_df.to_dict(orient='records')
-    
-    for i in workingCapital_predicted_dict:
-        for j in balanceSheet_dict:
-            try:
-                if i['SAR'] == j['BALANCE SHEET']:
-                    my_dict = i
-                    if 'SAR' in my_dict:
-                        del my_dict['SAR']
-                    
-                    j.update(my_dict)
-            except:
-                pass
+    workingCapital_predicted_dict, balanceSheet_dict = working_Capital(balanceSheet_df, workingCapital_df, last_year)    
     
     """
         Working with Debt
     """
     
-    debt_df = debt_df[debt_df['DEBT'] == 'Closing Balance']
-    debt_df = debt_df.loc[:, str(last_year+1): ]
-    
-    if not debt_df.empty:
-        debt_dict = debt_df.to_dict(orient='records')[0]
-        
-        for data in balanceSheet_dict:
-            if data['BALANCE SHEET'] == "Short-term borrowings":
-                data.update(debt_dict)
-                break
+    debt_df, balanceSheet_dict = debt_checking(debt_df, balanceSheet_dict, last_year)
     
     """
         Working on Fixed Assets
     """
     
-    fixedAsset_df = fixedAsset_df[fixedAsset_df['FA'] == 'Closing Balance - NBV']
-    fixedAsset_df = fixedAsset_df.loc[:, str(last_year+1): ]
-    
-    if not fixedAsset_df.empty:
-        fixedAsset_dict = fixedAsset_df.to_dict(orient='records')[0]
-        
-        for data in balanceSheet_dict:
-            if data['BALANCE SHEET'] == "Property and equipment":
-                data.update(fixedAsset_dict)
-                break
+    fixedAsset_df, balanceSheet_dict = FA_checking(fixedAsset_df, balanceSheet_dict, last_year)
     
     """
         Working on Equity
     """
     
-    Equity_df = Equity_df[Equity_df['EQUITY'].isin(['Share capital','Statutory reserve','Retained earnings'])]
-    
-    if not Equity_df.empty:
-        
-        for data in balanceSheet_dict:
-            if data['BALANCE SHEET'] == 'Share capital':
-                data.update(Equity_df[Equity_df['EQUITY'] == 'Share capital'].loc[:, str(last_year+1): ].to_dict(orient='records')[0])
-            
-            elif data['BALANCE SHEET'] == 'Statutory reserve':
-                data.update(Equity_df[Equity_df['EQUITY'] == 'Statutory reserve'].loc[:, str(last_year+1): ].to_dict(orient='records')[0])
-            
-            elif data['BALANCE SHEET'] == 'Retained earnings':
-                data.update(Equity_df[Equity_df['EQUITY'] == 'Retained earnings'].loc[:, str(last_year+1): ].to_dict(orient='records')[0])
+    Equity_df, balanceSheet_dict = equity_checking(Equity_df, balanceSheet_dict, last_year)
     
     updated_balanceSheet_df = pd.DataFrame(balanceSheet_dict)
     
+    """
+    
+    """
+    
+    # Convert all column names to string
+    updated_balanceSheet_df.columns = updated_balanceSheet_df.columns.astype(str)
+
+    # Rearranging columns based on data type
+    # Categorical and numerical identification
+    categorical_cols = [col for col in updated_balanceSheet_df.columns if updated_balanceSheet_df[col].dtype == object]
+    numerical_cols = [col for col in updated_balanceSheet_df.columns if updated_balanceSheet_df[col].dtype != object]
+
+    # Ensuring specific order for year columns by checking if column names are all digits
+    year_cols = [col for col in numerical_cols if col.isdigit()]
+    other_numerical_cols = [col for col in numerical_cols if not col.isdigit()]
+
+    # Define the specific order requested: [name, age, city, salary, years...]
+    new_order = categorical_cols + other_numerical_cols + sorted(year_cols)
+    
+    # Rearrange the DataFrame according to the new order
+    updated_balanceSheet_df = updated_balanceSheet_df.reindex(columns=new_order)
+    
+    updated_balanceSheet_df.to_csv("updated_balanceSheet_df.csv", index=False)
+    
     temp_balanceSheet_df = process_sheet(updated_balanceSheet_df)
-    # st.dataframe(temp_balanceSheet_df, hide_index=True)
     
     temp_balanceSheet_dict = temp_balanceSheet_df.to_dict(orient = 'records')
     
     for index, bs_data in enumerate(temp_balanceSheet_dict):
         
-        if bs_data['year'] > last_year:
-            bs_data['current assets'] = bs_data['trade receivables'] + bs_data['due from related parties'] + bs_data['inventories'] + bs_data['prepayments and other receivables']
-            bs_data['current liabilities'] = bs_data['short-term borrowings'] + bs_data['trade payables'] + bs_data['accrued expenses and other liabilities'] + bs_data['due to related parties'] + bs_data['zakat payable']
-            
-            bs_data['cash and cash equivalents'] = bs_data['current liabilities'] - bs_data['current assets']
-            bs_data['investments at fair value through profit or loss'] = 0
-            bs_data['equity accounted investment'] = 0
-            
-            if index != 0 and bs_data['other receivables'] != 0:
+        try:
+            if int(bs_data['year']) > last_year:
+                bs_data['current assets'] = bs_data['trade receivables'] + bs_data['due from related parties'] + bs_data['inventories'] + bs_data['prepayments and other receivables']
+                bs_data['current liabilities'] = bs_data['short-term borrowings'] + bs_data['trade payables'] + bs_data['accrued expenses and other liabilities'] + bs_data['due to related parties'] + bs_data['zakat payable']
                 
-                bs_data['other receivables'] = temp_balanceSheet_dict[index - 1]['other receivables']
+                bs_data['cash and cash equivalents'] = bs_data['current liabilities'] - bs_data['current assets']
+                bs_data['investments at fair value through profit or loss'] = 0
+                bs_data['equity accounted investment'] = 0
+                
+                if index != 0 and bs_data['other receivables'] != 0:
+                    
+                    bs_data['other receivables'] = temp_balanceSheet_dict[index - 1]['other receivables']
+                
+                bs_data['non-current assets'] = bs_data['property and equipment'] + bs_data['investments at fair value through profit or loss'] + bs_data['equity accounted investment'] + bs_data['other receivables']
+                bs_data['total assets'] = bs_data['current assets'] + bs_data['non-current assets']
+                
+                bs_data['employee termination benefits'] = temp_balanceSheet_dict[index - 1]['employee termination benefits'] # multiply by IS_CRNT value
+                bs_data['due to related parties(current liabilities)'] = 0
+                bs_data['non-current liabilities'] = bs_data['employee termination benefits'] + bs_data['due to related parties(current liabilities)']
+                
+                bs_data["shareholders' equity"] = bs_data['share capital'] + bs_data['statutory reserve'] + bs_data['retained earnings']
+                
+                bs_data['total liabilities & equity'] = bs_data['current liabilities'] + bs_data['non-current assets'] + bs_data["shareholders' equity"]
+        except:
+            pass
             
-            bs_data['non-current assets'] = bs_data['property and equipment'] + bs_data['investments at fair value through profit or loss'] + bs_data['equity accounted investment'] + bs_data['other receivables']
-            bs_data['total assets'] = bs_data['current assets'] + bs_data['non-current assets']
-            
-            bs_data['employee termination benefits'] = temp_balanceSheet_dict[index - 1]['employee termination benefits'] # multiply by IS_CRNT value
-            bs_data['due to related parties(current liabilities)'] = 0
-            bs_data['non-current liabilities'] = bs_data['employee termination benefits'] + bs_data['due to related parties(current liabilities)']
-            
-            bs_data["shareholders' equity"] = bs_data['share capital'] + bs_data['statutory reserve'] + bs_data['retained earnings']
-            
-            bs_data['total liabilities & equity'] = bs_data['current liabilities'] + bs_data['non-current assets'] + bs_data["shareholders' equity"]
-    
-    temp_balanceSheet_df = pd.DataFrame(temp_balanceSheet_dict)
-    temp_balanceSheet_df = tranposing(df=temp_balanceSheet_df, column_name="BALANCE SHEET")
-    
-    temp_balanceSheet_df = temp_balanceSheet_df.to_json(orient='records')
+        temp_balanceSheet_df = pd.DataFrame(temp_balanceSheet_dict)
+        temp_balanceSheet_df = tranposing(df=temp_balanceSheet_df, column_name="BALANCE SHEET")
+        
+        temp_balanceSheet_df.to_csv("temp_balanceSheet_df.csv", index=False)
+        
+        temp_balanceSheet_df = temp_balanceSheet_df.to_json(orient='records')
     
     return temp_balanceSheet_df
 
