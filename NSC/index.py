@@ -487,8 +487,6 @@ def balanceSheet():
     # Rearrange the DataFrame according to the new order
     updated_balanceSheet_df = updated_balanceSheet_df.reindex(columns=new_order)
     
-    updated_balanceSheet_df.to_csv("updated_balanceSheet_df.csv", index=False)
-    
     temp_balanceSheet_df = process_sheet(updated_balanceSheet_df)
     
     temp_balanceSheet_dict = temp_balanceSheet_df.to_dict(orient = 'records')
@@ -523,8 +521,6 @@ def balanceSheet():
             
         temp_balanceSheet_df = pd.DataFrame(temp_balanceSheet_dict)
         temp_balanceSheet_df = tranposing(df=temp_balanceSheet_df, column_name="BALANCE SHEET")
-        
-        temp_balanceSheet_df.to_csv("temp_balanceSheet_df.csv", index=False)
         
         temp_balanceSheet_df = temp_balanceSheet_df.to_json(orient='records')
     
