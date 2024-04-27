@@ -447,28 +447,11 @@ def balanceSheet():
     balanceSheet_df = read_excel_file(file_path='', sheet_name='BALANCESHEET')
     
     balanceSheet_dict = balanceSheet_df.to_dict(orient='records')
-    
     last_year = balanceSheet_df.columns.to_list()[-1]
     
-    """
-        Working with WC
-    """
+    workingCapital_predicted_dict= working_Capital(balanceSheet_df, workingCapital_df)
     
-    workingCapital_predicted_df = workingCapital_df.loc[:, str(last_year+1): ]
-    workingCapital_predicted_df = pd.concat([workingCapital_df.iloc[:, : 1], workingCapital_predicted_df], axis=1)
-    workingCapital_predicted_dict = workingCapital_predicted_df.to_dict(orient='records')
-    
-    for i in workingCapital_predicted_dict:
-        for j in balanceSheet_dict:
-            try:
-                if i['SAR'] == j['BALANCE SHEET']:
-                    my_dict = i
-                    if 'SAR' in my_dict:
-                        del my_dict['SAR']
-                    
-                    j.update(my_dict)
-            except:
-                pass
+    return "testing", 200
     
     """
         Working with Debt
@@ -520,7 +503,7 @@ def balanceSheet():
     
     updated_balanceSheet_df = pd.DataFrame(balanceSheet_dict)
     
-    temp_balanceSheet_df = process_sheet(updated_balanceSheet_df)
+    temp_balanceSheet_df = process_assumption_sheet(updated_balanceSheet_df)
     # st.dataframe(temp_balanceSheet_df, hide_index=True)
     
     temp_balanceSheet_dict = temp_balanceSheet_df.to_dict(orient = 'records')
