@@ -7,6 +7,7 @@ from modules.is_current import isCurrent
 from modules.wc import working_capital_indicators, working_capital
 from modules.bs import working_Capital, debt_checking, FA_checking, equity_checking
 from modules.gen_admin import get_assumption, general_admin_exp
+from modules.sm_expenses import get_sm_assumptions, sm_expenses
 
 app = Flask(__name__)
 
@@ -530,11 +531,10 @@ def balanceSheet():
 
 @app.route('/ga_assumption', methods=['GET'])
 def get_ga_assumption():
-    
     return get_assumption(), 200
 
 @app.route('/g_a', methods=['POST'])
-def GandA():
+def get_ga_expenses():
     if request.is_json:
         # Extract data from the JSON request
         data = request.get_json()
@@ -553,5 +553,31 @@ def GandA():
 
     else:
         return jsonify({"error": "Request must be JSON"}), 400  
+
+@app.route('/sm_assumption', methods=['GET'])
+def get_sm_assumption():
+    return get_sm_assumptions(), 200
+
+@app.route('/sm_data', methods=['POST'])
+def get_sm_expenses():
+    if request.is_json:
+        # Extract data from the JSON request
+        data = request.get_json()
+        assumption_dict = data.get('df_assumption', None)
+        
+        df_sm = read_excel_file(file_path='', sheet_name='Selling and marketing expenses')
+    
+        temp_sm = process_sheet(df_sm)
+        
+        year_ga = temp_sm['year'].to_list()
+        last_year = year_ga[-1]
+        
+        df_sm = sm_expenses(assumption_dict, df_sm, last_year)
+        sm_json = df_sm.to_json(orient='records')
+        return sm_json, 200
+
+    else:
+        return jsonify({"error": "Request must be JSON"}), 400  
+    
 if __name__ == '__main__':
     app.run(debug=True)
