@@ -6,8 +6,8 @@ import json
 from modules.is_current import isCurrent
 from modules.wc import working_capital_indicators, working_capital
 from modules.bs import working_Capital, debt_checking, FA_checking, equity_checking
-from modules.gen_admin import get_assumption, general_admin_exp
-from modules.sm_expenses import get_sm_assumptions, sm_expenses
+from modules.gen_admin import get_assumption, general_admin_exp, key_indicators, annual_growth, per_of_rev
+from modules.sm_expenses import get_sm_assumptions, sm_expenses, sm_key_indicators, sm_annual_growth, sm_per_of_rev
 
 app = Flask(__name__)
 
@@ -533,7 +533,7 @@ def balanceSheet():
 def get_ga_assumption():
     return get_assumption(), 200
 
-@app.route('/g_a', methods=['POST'])
+@app.route('/ga_expenses', methods=['POST'])
 def get_ga_expenses():
     if request.is_json:
         # Extract data from the JSON request
@@ -548,17 +548,66 @@ def get_ga_expenses():
         last_year = year_ga[-1]
         
         df_ga = general_admin_exp(assumption_dict, df_ga, last_year)
+        df_ga = process_sheet(df_ga)
+        ga_dict = df_ga.to_dict(orient="records")
+        
+        for i in range(len(ga_dict)):
+            value = 0
+            for key, val in ga_dict[i].items():
+                
+                if key == 'year':
+                    continue
+                
+                if key != 'total':
+                    value += val
+            
+            ga_dict[i]['total'] = value
+        
+        df_ga = pd.DataFrame(ga_dict)
+        df_ga = tranposing(df_ga, column_name='G&A')
+        
         ga_json = df_ga.to_json(orient='records')
         return ga_json, 200
 
     else:
         return jsonify({"error": "Request must be JSON"}), 400  
 
+@app.route('/ga_key_indicator', methods=['POST'])
+def get_ga_key_indicator():
+    if request.is_json:
+        # Extract data from the JSON request
+        data = request.get_json()
+        df_is_crnt = pd.DataFrame(data.get("df_is_crnt", None))
+        df_ga = pd.DataFrame(data.get("ga_expenses", None))
+        
+        
+        
+        return key_indicators(df_is_crnt=df_is_crnt, df_ga=df_ga)
+
+@app.route('/ga_annual_growth', methods=['POST'])
+def get_ga_annual_growth():
+    if request.is_json:
+        # Extract data from the JSON request
+        data = request.get_json()
+        df_ga = data.get("ga_expenses", None)
+        
+        return annual_growth(df_ga=df_ga)
+    
+@app.route('/get_ga_per_of_rev', methods=['POST'])
+def get_ga_per_of_rev():
+    if request.is_json:
+        # Extract data from the JSON request
+        data = request.get_json()
+        df_is_crnt = data.get("df_is_crnt", None)
+        df_ga = data.get("ga_expenses", None)
+        
+        return per_of_rev(df_is_crnt=df_is_crnt, df_ga=df_ga)
+
 @app.route('/sm_assumption', methods=['GET'])
 def get_sm_assumption():
     return get_sm_assumptions(), 200
 
-@app.route('/sm_data', methods=['POST'])
+@app.route('/sm_expenses', methods=['POST'])
 def get_sm_expenses():
     if request.is_json:
         # Extract data from the JSON request
@@ -573,11 +622,60 @@ def get_sm_expenses():
         last_year = year_ga[-1]
         
         df_sm = sm_expenses(assumption_dict, df_sm, last_year)
+        
+        df_sm = process_sheet(df_sm)
+        sm_dict = df_sm.to_dict(orient="records")
+        
+        for i in range(len(sm_dict)):
+            value = 0
+            for key, val in sm_dict[i].items():
+                
+                if key == 'year':
+                    continue
+                
+                if key != 'total':
+                    value += val
+            
+            sm_dict[i]['total'] = value
+        
+        df_sm = pd.DataFrame(sm_dict)
+        df_sm = tranposing(df_sm, column_name='G&A')
+        
         sm_json = df_sm.to_json(orient='records')
         return sm_json, 200
 
     else:
         return jsonify({"error": "Request must be JSON"}), 400  
+
+@app.route('/sm_key_indicator', methods=['POST'])
+def get_sm_key_indicator():
+    if request.is_json:
+        # Extract data from the JSON request
+        data = request.get_json()
+        df_is_crnt = pd.DataFrame(data.get("df_is_crnt", None))
+        df_ga = pd.DataFrame(data.get("sm_expenses", None))
+        
+        return sm_key_indicators(df_is_crnt=df_is_crnt, df_ga=df_ga)
+
+@app.route('/sm_annual_growth', methods=['POST'])
+def get_sm_annual_growth():
+    if request.is_json:
+        # Extract data from the JSON request
+        data = request.get_json()
+        df_ga = data.get("sm_expenses", None)
+        
+        return sm_annual_growth(df_ga=df_ga)
     
+@app.route('/sm_per_of_rev', methods=['POST'])
+def get_sm_per_of_rev():
+    if request.is_json:
+        # Extract data from the JSON request
+        data = request.get_json()
+        df_is_crnt = data.get("df_is_crnt", None)
+        df_ga = data.get("sm_expenses", None)
+        
+        return sm_per_of_rev(df_is_crnt=df_is_crnt, df_ga=df_ga)
+
+
 if __name__ == '__main__':
     app.run(debug=True)
